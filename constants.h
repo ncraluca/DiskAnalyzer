@@ -14,9 +14,9 @@
 
 const char *daemon_pid = "/tmp/disk-analyzer/daemon.pid";
 const char *da_pid = "/tmp/disk-analyzer/da.pid";
-const char *input_from_user= "/tmp/disk-analyzer/input.txt";
-const char *output_from_daemon_prefix= "/tmp/disk-analyzer/output";
-const char *output_from_daemon= "/tmp/disk-analyzer/output.txt";
-const char *debug_daemon= "/tmp/disk-analyzer/debug.txt";
+const char *input_from_user = "/tmp/disk-analyzer/input.txt";
+const char *output_from_daemon_prefix = "/tmp/disk-analyzer/output";
+const char *output_from_daemon = "/tmp/disk-analyzer/output.txt";
+const char *debug_daemon = "/tmp/disk-analyzer/debug.txt";
 
 #endif
