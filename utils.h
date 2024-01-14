@@ -67,7 +67,7 @@ int map_find_task(struct my_map *m, char *path){
 
 //functia list_find_by_key returneaza threadul cu id-ul key - folosita in functia Remove
 struct thr_node* list_find_by_key(struct thr_node** head_ref, int key){
-    log_daemon("In list_find_by_key\n");
+    daemon_message("In list_find_by_key\n");
     struct thr_node *current = (struct thr_node*)malloc(sizeof(struct thr_node));
     current = *head_ref;
     while(current != NULL){
