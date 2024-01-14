@@ -16,6 +16,11 @@ struct my_map *tasks;
 struct thr_node **list_head;
 pthread_mutex_t mtx_lock, mtx_lock_map;
 
+struct thread_args {
+  char *path;
+  int priority, id;
+};
+
 void daemon_message(const char *msg) {
   int fd = open(output_from_daemon, O_CREAT | O_APPEND | O_WRONLY,
                 S_IRWXU | S_IRWXG | S_IRWXO);
@@ -364,10 +369,4 @@ void update_done_status(struct thr_node *node) {
     free(aux);
   }
 }
-
-struct thread_args {
-  char *path;
-  int priority, id;
-};
-
 #endif

@@ -1,13 +1,13 @@
-
 #include "constants.h"
 #include "utils.h"
-#include <cstdlib>
 #include <errno.h>
 #include <fts.h>
 #include <pthread.h>
+#include <sched.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+
 void *disk_analyzer(void *args) {
   daemon_message("Reached disk_analyzer function\n");
   struct thread_args *th_args = (struct thread_args *)args;
