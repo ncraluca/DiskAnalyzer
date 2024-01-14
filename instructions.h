@@ -1,87 +1,302 @@
 #ifndef INSTRUCTIONS_H_INCLUDED
 #define INSTRUCTIONS_H_INCLUDED
 
-#include <cstdio> //de ce nu merg bibliotecile?
-#include <fcntl.h>
-#include <unistd.h>
-#include <cstring>
+#include <stdio.h>  // for perror
+#include <fcntl.h>  // for open flags
+#include <unistd.h> // for write/close/sleep/pathconf functions
+#include <string.h>
 #include <fts.h>
-#include <cerrno>
+#include <errno.h>
 #include <pthread.h>
-#include <cstdlib>
-#include <climits>
+#include <stdlib.h> // for malloc
+#include <limits.h>
 #include "utils.h"
+#include <linux/limits.h>
 
-void help(char *res) {
-    // Your function implementation here
+
+//functie care returneaza un string cu toate instructiunile
+void Help(char *buf) {
+    debug_daemon("We are in Help method...\n");
+    sprintf(buf, "%s",
+            "Usage: da [OPTION]... [DIR]...\n"
+            "Analyze the space occupied by the directory ai [DIR]\n"
+            "\t-a, --add\t\tanalyze the new directory path for disk usage\n"
+            "\t-p, --priority\t\tset priority for the new analysis (works only with -a argument)\n"
+            "\t-S, --suspend <id>\tsuspend task with id <id>\n"
+            "\t-R, --resume <id>\tresume task with <id>\n"
+            "\t-r, --remove <id>\tremove the analysis with the given <id>\n"
+            "\t-i, --info <id>\t\tprint status about the analysis with <id> (pending, progress, done)\n"
+            "\t-l, --list\t\tlist all analysis tasks, with their ID and the corresponding root path\n"
+            "\t-p, --print <id>\tprint analysis report for those tasks that are 'done'\n");
 }
 
-void add(char *path, char *priority, char *res) {
-    // Your function implementation here
+//functie care adauga un task nou in lista de task-uri
+void Add(char *path, char *priority, char *buf){
+    debug_daemon("We are in Add method...\n");
+
+    //atribuim un id unic task-ului
+    int task_id; 
+
+    //verificam daca task-ul exista deja in lista de task-uri
+    int existing_task = map_find_task(tasks, path); //functia e in alt fisier
+
+    //se aloca memorie pentru un nou thread
+    pthread_t *new_thread = malloc(sizeof(pthread_t));
+
+    //daca task-ul nu exista deja in lista de task-uri, il adaugam
+    if(existing_task == -1){
+        //adaugam task-ul in lista de task-uri si ii atribuim un id unic
+        task_id = get_next_task_id(); //functia e in alt fisier
+
+        //adaugam task-ul in lista de task-uri
+        map_insert(tasks, task_id, path); 
+        
+        debug_daemon("The task was added in the map\n");
+
+        // construim argumentele unui thread pentru task-ul adaugat
+        struct thread_args *arguments = malloc(sizeof(struct thread_args));
+      
+        arguments->path = path; //path-ul task-ului de analizat
+        arguments->priority = atoi(priority); //prioritatea task-ului de analizat
+        arguments->id = task_id; //id-ul task-ului de analizat, id-ul unui thread = id-ul task-ului
+
+        debug_daemon("Before the function pthread_create\n");
+        
+        //cream un nou thread pentru task-ul adaugat
+        if (pthread_create(new_thread, NULL, disk_analyzer, arguments)){
+            //disk_analyzer e in alt fisier
+            char *buf_error = malloc(30);
+            sprintf(buf_error, "Could not create a new thread: %d\n", errno);  //daca nu se poate crea un nou thread, se afiseaza eroarea          
+            debug_daemon(buf_error);
+            perror(NULL);
+        }
+        debug_daemon("After pthread_create executed\n");
+        sprintf(buf, "Created analysis task with ID %d for '%s' and priority '%s'.\n", task_id, path, priority);
+    } 
+    else {
+        debug_daemon("This directory is already included in the analysis\n");
+        sprintf(buf, "Directory '%s' is already included in analysis with ID '%d'", path, existing_task);
+    }
 }
 
-void suspend(int id, char *res){
+void Suspend(int id, char *buf){
+    debug_daemon("We are in Suspend method...\n");
+     //ideea e ca trebuie sa cautam in lista de threaduri threadul cu id-ul id si sa-l suspendam
+    //eventual ii punem un status temporar de suspended
+    //IDEE: cream un nou camp in structura thr_node care sa fie un bool, un int: int suspended = 0(0 inseamna ca nu e suspendat, 1 inseamna ca e suspendat)
+    //cand facem suspend, punem suspended = 1, iar cand facem resume punem suspended = 0
+    //cand facem suspend, verificam daca suspended == 0, daca da, atunci facem suspend, daca nu, nu facem nimic
+    //cand facem resume, verificam daca suspended == 1, daca da, atunci facem resume, daca nu, nu facem nimic
+    //in disk analyzer sau in programul care executa thread-urile ar trb sa se verifice mereu daca el e suspendat sau nu (are 
+    //un while(1) in care se verifica daca e suspendat sau nu, daca nu e suspendat, face ce are de facut)
+
+    /*//tot nu e f buna ca sterge de tot thread-ul
+    struct thr_node *thread_node = list_find_by_key(list_head, id);
+    if (thread_node == NULL) {
+        sprintf(buf, "No existing analysis for task ID %d, there is nothing to suspend", id);
+        debug_daemon(buf);
+    } else {
+        thread_node->suspended = 1;
+        sprintf(buf, "Suspended analysis task with ID %d", id);
+        debug_daemon(buf);
+        } 
+    }
+    */
+
+    /*gresita
+    int existing_task = map_find_task(tasks, id);
+    if(existing_task != -1){
+        if (pthread_cancel(existing_task)){
+
+            char *buf_error = malloc(30);
+            sprintf(buf_error, "Could not cancel the thread: %d\n", errno);
+            debug_daemon(buf_error);
+            perror(NULL);
+        }
+        sprintf(buf, "Suspended analysis task with ID %d.\n", id);
+    } else {
+        sprintf(buf, "No analysis task with ID %d.\n", id);
+    }
+    */
+
+}
+    
+
+
+
+void Resume(int id, char *buf){
+    debug_daemon("We are in Resume method...\n");
+    /*ideea e ca trebuie sa cautam in lista de threaduri threadul cu id-ul id si sa-l resume(sa il scoata din suspend)
+     struct thr_node *thread_node = list_find_by_key(list_head, id);
+    if (thread_node == NULL) {
+        sprintf(buf, "No existing analysis for task ID %d, there is nothing to suspend", id);
+        debug_daemon(buf);
+    } else {
+        thread_node->suspended = 0;
+        sprintf(buf, "Resumed analysis task with ID %d", id);
+        debug_daemon(buf);
+        } 
+    }
+
+*/
 }
 
-void resume(int id, char *res){
+//functie care sterge un task din lista de task-uri
+void Remove(int id, char *buf){
+    debug_daemon("We are in Remove method...\n");
+    //cautam threadul cu id-ul id in lista de threaduri
+    struct thr_node *thread_node = list_find_by_key(list_head, id);
+    
+    //daca nu exista threadul cu id-ul id in lista de threaduri inseamna ca nu exista task-ul cu id-ul cautat
+    if(thread_node == NULL){
+        sprintf(buf, "No existing analysis for task ID %d, there is nothing to remove", id);
+    } else {
+        //daca exista se cauta in map task-ul cu id-ul id
+        struct fd_node *node = map_find(tasks, thread_node->id);
+        char *path = (char*)node->val;
+        //se sterge threadul 
+        int existing_thread = pthread_cancel(*thread_node->thr);
+        //daca threadul nu exista inseamna ca nu exista task-ul cu id-ul cautat
+        if(existing_thread == -1){
+            debug_daemon(buf);
+        } else {
+            //daca threadul exista, se asteapta sa se termine
+            void *thr_ret;
+            pthread_join(*thread_node->thr, &thr_ret); //pune in thr_ret 0 daca s-a terminat, daca nu pune un cod de eroare
+            if (thr_ret != PTHREAD_CANCELED){
+                debug_daemon(buf);
+            }
+        }
+
+
+        //se sterge task-ul din lista de task-uri si din map
+        list_delete(list_head, id);//functia e in alt fisier
+        map_delete(tasks, id);//functia e in alt fisier
+       
+        sprintf(buf, "Removed analysis task with ID %d, status %s for %s", id, thread_node->done_status, path);
+    }
 }
 
-void remove(int id, char *res){
+//functie care afiseaza informatii despre un task
+void Info(int id, char *buf){
+    debug_daemon("We are in Info method...\n");
+    //cautam threadul cu id-ul id in lista de threaduri
+    struct thr_node *thread_node = list_find_by_key(list_head, id);
+    //daca nu exista threadul cu id-ul id in lista de threaduri inseamna ca nu exista task-ul cu id-ul cautat
+    if(thread_node == NULL){
+        sprintf(buf, "No existing analysis for task ID %d, no info can be displayed", id);
+    } else {
+        //daca exista se cauta in map task-ul cu id-ul id
+        sprintf(buf, "ID\tPRI\tPath\tDone Status\tDetails\n");
+        char priority[3]="***"; //prioritatea e reprezentata de 3 stelute
+        struct fd_node *node = map_find(tasks, thread_node->id);
+        char *path = (char*)node->val;
+        //se afiseaza informatii despre task
+        sprintf(buf + strlen(buf), "%d\t%s\t%s\t%s\t%d files, %d dirs\n", thread_node->id, priority+ (3-thread_node->priority), path, 
+                                thread_node->done_status, thread_node->files, thread_node->dirs);
+    }
+}
+    
+
+//functie care afiseaza informatii despre toate task-urile
+void List(char *buf){
+    debug_daemon("We are in List method...\n");
+    sprintf(buf, "ID\tPRI\tPath\tDone Status\tDetails\n");
+    //se parcurge lista de task-uri
+    for(int i = 0; i < tasks->length; i++){
+        if(tasks->lista[i] != NULL){ //daca lista de task-uri nu e goala
+            struct fd_node *node; 
+            for (node = tasks->lista[i]; node != NULL; node = node->next) { //se parcurge lista de fd_node
+                debug_daemon("Inainte de list_head\n"); 
+                struct thr_node *thread_node = list_find_by_key(list_head, node->id); //se cauta threadul cu id-ul node->id in lista de threaduri
+                debug_daemon("Dupa list_head\n");
+                char priority[3]="***"; //prioritatea e reprezentata de 3 stelute
+                debug_daemon("Inainte de map_find\n");
+                struct fd_node *node2 = map_find(tasks, node->id); //se cauta taskul cu id-ul node->id in map
+                debug_daemon("Dupa map_find\n");
+                char *path = (char*)node2->val; //path-ul task-ului
+                debug_daemon("Dupa conversie path\n");
+                sprintf(buf + strlen(buf), "%d\t%s\t%s\t%s\t%d files, %d dirs\n", node->id, priority+(3-thread_node->priority), path, 
+                                    thread_node->done_status, thread_node->files, thread_node->dirs); //se afiseaza informatii despre task
+                debug_daemon("Eroare dupa sprintf\n");
+            }
+        }
+    }
 }
 
-void info(int id, char *res){
+//functie care afiseaza raportul de analiza pentru task-ul cu id-ul id
+void Print(int id, char *buf){
+    debug_daemon("We are in Print method...\n");
+    //cautam threadul cu id-ul id in lista de threaduri
+    struct thr_node *thread_node = list_find_by_key(list_head, id);
+    if(thread_node == NULL){ //daca nu exista threadul cu id-ul id in lista de threaduri inseamna ca nu exista task-ul cu id-ul cautat
+        sprintf(buf, "No existing analysis for task ID %d", id);
+    } 
+    else if(strcmp(thread_node->done_status, "done") == 0){ //daca task-ul este terminat
+        char *output_path = malloc(PATH_MAX);
+        char *msg = malloc(PATH_MAX+30); //se aloca memorie pentru path-ul fisierului de output si pentru un mesaj de eroare
+
+        sprintf(output_path, "%s_%d.txt", output_from_daemon_prefix, id); //se construieste path-ul fisierului de output
+        sprintf(msg, "Couldn't open %s file\n", output_path); //se construieste mesajul de eroare
+
+        read_from_file(output_path, msg, buf); //se citeste din fisierul de output si se pune in buf
+
+        debug_daemon(buf); //se afiseaza in debug_daemon continutul lui buf
+    } 
+    else {
+        sprintf(buf, "Print analysis report available only for those tasks that are 'done'");
+    }
 }
 
-void list(char *res){
-}
 
-void print_id(int id, char *res){
-}
-
-void handling_instructions(char *instruction, char *res){
-    /*
+//functie care primeste instructiuni de la utilizator si apeleaza functiile corespunzatoare
+void handling_instructions(char *instruction, char *buf){
     char *command = strtok(instruction, "\n");
-    int id;
+    int task_id;
     switch (atoi(command)){
         case 0: // HELP command
-            //help(res);
+            Help(buf);
             break;
         case 1: // ADD command
-            //;
-            //add(path, priority, res);
+            ;
+            char *path = malloc(PATH_MAX);
+            path = strtok(NULL, "\n");
+            char *priority = malloc(PATH_MAX);
+            priority = strtok(NULL, "\n");
+            debug_daemon(priority);
+            Add(path, priority, buf);
             break;
         case 2: // SUSPEND command
-            //;
-            //id = atoi(strtok(NULL, "\n"));
-            //suspend(id, res);
+            ;
+            task_id = atoi(strtok(NULL, "\n"));
+            Suspend(task_id, buf);
             break;
         case 3: // RESUME commnad
-            //;
-            //id = atoi(strtok(NULL, "\n"));
-            //resume(id, res);
+            ;
+            task_id = atoi(strtok(NULL, "\n"));
+            Resume(task_id, buf);
             break;
         case 4: // REMOVE commnad
-            //;
-            //id = atoi(strtok(NULL, "\n"));
-            //remove(id, res);
+            ;
+            task_id = atoi(strtok(NULL, "\n"));
+            Remove(task_id, buf);
             break;
         case 5: // INFO commnad
-            //;
-            //id = atoi(strtok(NULL, "\n"));
-            //info(id, res);
+            ;
+            task_id = atoi(strtok(NULL, "\n"));
+            Info(task_id, buf);
             break;
         case 6: // LIST commnad
-            //list(res);
+            List(buf);
             break;
         case 7: // PRINT commnad
-            //;
-            //id = atoi(strtok(NULL, "\n"));
-            //print_id(id, res);
+            ;
+            task_id = atoi(strtok(NULL, "\n"));
+            Print(task_id, buf);
             break;
         default:
             break;
     }
-    */
 }
 
 #endif // INSTRUCTIONS_H_INCLUDED

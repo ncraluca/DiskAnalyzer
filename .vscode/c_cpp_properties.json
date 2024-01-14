@@ -3,8 +3,9 @@
         {
             "name": "Linux",
             "includePath": [
-                "$/home/raluca/Desktop/proiectso/DiskAnalyzer/instructions.h"
-            ],
+                "${workspaceFolder}",
+                "${workspaceFolder}/**"
+            ],            
             "defines": [],
             "compilerPath": "/usr/bin/gcc",
             "cStandard": "c17",
