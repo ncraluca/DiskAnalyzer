@@ -9,14 +9,14 @@
 
 int daemon_pid;
 
-int read_result_from_daemon(int signo){
+int read_results_from_daemon(int signo){
     char final_result = malloc(RESULT_SIZE);
     read_from_file(output_from_daemon, "Error at opening output file from deamon\n", final_result);
     printf("%s\n",final_result);
 }
 
 void write_da_pid(){
-    create_dir_if_needed(da_pid_path);
+    create_directory(da_pid_path);
     char *pid_da_string = malloc(10);
     int pid = getpid();
     sprintf(pid_da_string, "%d", pid); //converted int to string so it could be written in the file
@@ -44,8 +44,8 @@ void invalid_arguments_message(){
     printf("Use --help command for more information. \n");
 }
 
-void send_input_from_user_to_daemon(const char* instruction){
-    create_dir_if_needed(input_from_user);
+void write_to_daemon(const char* instruction){
+    create_directory(input_from_user);
     int fd = open(input_from_user, O_CREAT|O_TRUNC|O_WRONLY, S_IRWXU|S_IRWXG|S_IRWXO);
     write(fd, instruction, strlen(instruction));
     close(fd);
@@ -53,10 +53,9 @@ void send_input_from_user_to_daemon(const char* instruction){
     if(daemon_pid>0){
         //If daemon pid was correct send a signal to the daemon program
         kill(daemon_pid, SIGUSR1);
-
         sleep(2); //let da wait for 2 seconds for the daemon to process the instructions and give the signal back
-
     }
+    
     else{
         printf("Daemon is not running!");
         exit(-1);
@@ -68,7 +67,7 @@ int main(int argc, char *argv[]){
     //da.c and daemon.c communicate via signals
     //when da.c receives SIGUSR2 it means that the daemon finished a task and da.c can print it to the final user
     //when daemon.c receives SIGUSR1 it means that da.c sent as a set of instructions that the daemon has to resolve
-    signal(SIGUSR2, read_result_from_daemon);
+    signal(SIGUSR2, read_results_from_daemon);
     write_da_pid(); //put da pid in the file so the daemon could send back the SIGUSR2 when it finishes
     read_daemon_pid(); //read daemon pid so that the main program knows where to send the signal
     char* instruction = malloc(INSTR_LENGTH);
@@ -184,6 +183,6 @@ int main(int argc, char *argv[]){
         sprintf(instruction, "%s\n", HELP);
     }
 
-    send_input_from_user_to_daemon(instruction);
+    write_to_daemon(instruction);
 
 }
