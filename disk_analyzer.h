@@ -1,15 +1,15 @@
 
 #include "constants.h"
 #include "utils.h"
+#include <cstdlib>
 #include <errno.h>
 #include <fts.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
 void *disk_analyzer(void *args) {
-  log_daemon("Reached disk_analyzer function\n");
+  daemon_message("Reached disk_analyzer function\n");
   struct thread_args *th_args = (struct thread_args *)args;
   char *path = th_args->path;
   int id = (int)th_args->id, pri = (int)th_args->priority;
@@ -39,7 +39,7 @@ void *disk_analyzer(void *args) {
   int fd = open(output_path, O_CREAT | O_TRUNC | O_WRONLY,
                 S_IRWXU | S_IRWXG | S_IRWXO);
   if (fd < -1) {
-    log_daemon("Could not open output path\n");
+    daemon_message("Could not open output path\n");
     exit(-2);
   }
 
@@ -89,7 +89,7 @@ void *disk_analyzer(void *args) {
         update_done_status(n);
         char nr[19];
         sprintf(nr, "n->dirst:%d", n->dirs);
-        log_daemon(nr);
+        daemon_message(nr);
       } break;
 
       default:
@@ -99,8 +99,7 @@ void *disk_analyzer(void *args) {
 
     fts_close(file_system);
   }
-  log_daemon("After postorder traversal and before preorder traversal\n");
-  // TODO: change 9999 to a better number and move it to constants file
+  daemon_message("After postorder traversal and before preorder traversal\n");
   char *line = (char *)malloc(9999);
   // write the first line
   sprintf(line, "    Path\tUsage\tSize\t\tAmount\n");
@@ -179,5 +178,5 @@ void *disk_analyzer(void *args) {
   map_clear(&m);
   close(fd);
   n->done_status = "done";
-  log_daemon("Finish disk_analyzer function\n");
+  daemon_message("Finish disk_analyzer function\n");
 }

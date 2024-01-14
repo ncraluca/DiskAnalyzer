@@ -16,7 +16,7 @@ struct my_map *tasks;
 struct thr_node **list_head;
 pthread_mutex_t mtx_lock, mtx_lock_map;
 
-void log_daemon(const char *msg) {
+void daemon_message(const char *msg) {
   int fd = open(output_from_daemon, O_CREAT | O_APPEND | O_WRONLY,
                 S_IRWXU | S_IRWXG | S_IRWXO);
   if (fd < -1) {
@@ -26,15 +26,6 @@ void log_daemon(const char *msg) {
   close(fd);
 }
 int get_next_task_id() { return ++task_id; }
-
-void create_dir_if_not_exists(const char *path) {
-  struct stat st = {0};
-  if (stat(path, &st) == -1) {
-    mode_t oldmask = umask(0);
-    mkdir("/tmp/disk-analyzer", 0777);
-    umask(oldmask);
-  }
-}
 
 int compare(const FTSENT **one, const FTSENT **two) {
   return (strcmp((*one)->fts_name, (*two)->fts_name));
@@ -244,7 +235,7 @@ void list_delete(struct thr_node **head_ref, int key) {
 }
 
 struct thr_node *list_find_by_key(struct thr_node **head_ref, int key) {
-  log_daemon("In list_find_by_key\n");
+  daemon_message("In list_find_by_key\n");
   struct thr_node *current = (struct thr_node *)malloc(sizeof(struct thr_node));
   current = *head_ref;
   while (current != NULL) {
@@ -340,12 +331,12 @@ char *convert_size_to_standard_unit(float bytes) {
 }
 
 int get_file_size(const char *file_name) {
-  log_daemon("Inainte de fopen\n");
+  daemon_message("Inainte de fopen\n");
   FILE *fp = fopen(file_name, "r");
-  log_daemon("Dupa fopen\n");
+  daemon_message("Dupa fopen\n");
   if (fp == NULL) {
     printf("File Not Found!\n");
-    log_daemon("Dupa get file size\n");
+    daemon_message("Dupa get file size\n");
     return -1;
   }
   fseek(fp, 0, SEEK_END);
@@ -353,24 +344,6 @@ int get_file_size(const char *file_name) {
   fclose(fp);
 
   return res;
-}
-
-void read_from_file(const char *path, char *error_msg, char *res) {
-  log_daemon("In read_from_file\n");
-  log_daemon(path);
-  int size = 10000000; // get_file_size(path);
-  log_daemon("Dupa get file size\n");
-  int fd = open(path, O_RDONLY, S_IRWXU | S_IRWXG | S_IRWXO);
-  if (fd < 0) {
-    log_daemon("Eroare deschidere fisier\n");
-    // exit(-1);
-  }
-  log_daemon("Inainte de malloc\n");
-
-  log_daemon("Dupa malloc\n");
-  read(fd, res, size);
-  log_daemon("Dupa read\n");
-  close(fd);
 }
 
 void update_done_status(struct thr_node *node) {
@@ -386,7 +359,6 @@ void update_done_status(struct thr_node *node) {
     strcpy(node->done_status, "done");
   } else {
     char *aux = (char *)malloc(30);
-
     sprintf(aux, "%.1f%% in progress\n", percent);
     strcpy(node->done_status, aux);
     free(aux);
