@@ -24,6 +24,31 @@ void create_directory(const char * given_path){
         mkdir("/tmp/disk-analyzer",0777); //create the directory with 0777 permission = read(4)+write(2)+execute(1) => to all users
     }
 }
+int count_dirs(char *path) {
+  int count = 0;
+  FTS *file_system = NULL;
+  FTSENT *node = NULL;
+
+  char *paths[] = {path, NULL};
+  if (!(file_system = fts_open(paths, FTS_COMFOLLOW | FTS_NOCHDIR, &compare))) {
+    perror(NULL);
+    return errno;
+  }
+  if (file_system != NULL) {
+    while ((node = fts_read(file_system)) != NULL) {
+      switch (node->fts_info) {
+      case FTS_D:;
+        count++;
+        break;
+      default:
+        break;
+      }
+    }
+    fts_close(file_system);
+  }
+  return count;
+}
+
 void dir_hash_init(struct directory *m, int size){
     m->size = size;
     m->content = (struct file_directory **)malloc(size * sizeof(struct file_directory *));
@@ -40,7 +65,34 @@ void thread_list_init(){
 int get_next_task_id(){
     return ++task_id;
 }       
+void init_directory_tree(struct directory *m, int n) {
+  m->size = n;
+  m->content =
+      (struct file_directory **)malloc(n * sizeof(struct file_directory *));
+  for (int i = 0; i < n; i++)
+    m->content[i] = NULL;
+}
+void insert_task(struct thread_node **threads_head, int id, int priority,
+                 pthread_t *thr) {
 
+  struct thread_node *new_node =
+      (struct thread_node *)malloc(sizeof(struct thread_node));
+
+  new_node->id = id;
+  new_node->priority = priority;
+  new_node->thr = thr;
+  new_node->status = (char *)malloc(30);
+  strcpy(new_node->status, "preparing");
+  new_node->no_files = 0;
+  new_node->no_dirs = 0;
+  // find out total number of subdirectories
+  struct file_directory *node = dir_hash_find(tasks, id);
+  char *path = (char *)(node->fd_path);
+  new_node->no_dirs = count_dirs(path);
+
+  new_node->next = *threads_head;
+  *threads_head = new_node;
+}
 //functia find_task returneaza id-ul task-ului cu path-ul path, daca exista, si -1 altfel - folosita in functia Add    
 int find_task(struct directory *m, char *path){
     //se parcurge lista de taskuri
@@ -54,6 +106,11 @@ int find_task(struct directory *m, char *path){
     }
     return -1;
     }   
+void directory_clear(struct directory *m) {
+  for (int i = 0; i < m->size; i++)
+    free(m->content[i]);
+  free(m->content);
+}
 
 //functia map_insert insereaza in map un nou task - folosita in functia Add
  void dir_hash_insert(struct directory *m, int key, void *val) {
@@ -95,7 +152,18 @@ struct thread_node* find_thread_id(struct thread_node** head_ref, int key){
     }
     return NULL;
 }
-
+struct thread_node *find_thread(struct thread_node **head_ref, pthread_t thr) {
+  struct thread_node *current =
+      (struct thread_node *)malloc(sizeof(struct thread_node));
+  current = *head_ref;
+  while (current != NULL) {
+    if (pthread_equal(*(current->thr), thr)) {
+      return current;
+    }
+    current = current->next;
+  }
+  return NULL;
+}
 //functia *map_find returneaza nodul (task-ul) cu id-ul key - folosita in functia Remove si Info
 struct file_directory *dir_hash_find(struct directory *m, int key) {
     int mod = key % m->size; //se parcurge arborele si se cauta nivelul din arbore
@@ -106,6 +174,67 @@ struct file_directory *dir_hash_find(struct directory *m, int key) {
             return nod;
     }
     return NULL;
+}
+void clear_directory(struct directory *m) {
+  for (int i = 0; i < m->size; i++)
+    free(m->content[i]);
+  free(m->content);
+}
+
+char *progress(float percent) {
+  char *res = (char *)malloc(51);
+  res = "##################################################";
+  int number_of_hashtags = percent * 50 / 100;
+  res += (50 - number_of_hashtags);
+  return res;
+}
+
+char *convert_size(float bytes) {
+  char *size = (char *)malloc(20);
+  if (bytes >= 1024) { // KB
+    bytes /= 1024;
+    sprintf(size, "%.1f", bytes);
+    strcat(size, "KB");
+  }
+
+  if (bytes >= 1024) { // MB
+    bytes /= 1024;
+    sprintf(size, "%.1f", bytes);
+    strcat(size, "MB");
+  }
+
+  if (bytes >= 1024) { // GB
+    bytes /= 1024;
+    sprintf(size, "%.1f", bytes);
+    strcat(size, "GB");
+  }
+
+  if (bytes >= 1024) { // TB
+    bytes /= 1024;
+    sprintf(size, "%.1f", bytes);
+    strcat(size, "TB");
+  }
+
+  return size;
+}
+
+void update_done_status(struct thread_node *node) {
+  float percent;
+
+  if (node->no_all_dirs == 0) {
+    percent = 100;
+  } else {
+    percent = (1.0 * node->no_dirs * 100) / node->no_all_dirs;
+  }
+
+  if (abs(100 - percent) <= 0.00000000001) {
+    strcpy(node->status, "done");
+  } else {
+    char *aux = (char *)malloc(30);
+    sprintf(aux, "%.1f%% in progress\n", percent);
+    strcpy(node->status, aux);
+    free(aux);
+  }
 }
 
 //functia list_delete sterge threadul cu id-ul key - folosita in functia Remove
@@ -150,5 +279,7 @@ void dir_hash_delete(struct directory *m, int id){
         }
     }
 }
-
+int compare(const FTSENT **one, const FTSENT **two) {
+  return (strcmp((*one)->fts_name, (*two)->fts_name));
+}
 #endif

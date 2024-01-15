@@ -60,6 +60,3 @@ struct thread_node {
 
 struct directory *dir;
 struct thread_node **threads_head;
-
-
-#endif
