@@ -12,14 +12,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 int task_id;
-struct my_map *tasks;
-struct thr_node **list_head;
+struct directory *tasks;
 pthread_mutex_t mtx_lock, mtx_lock_map;
-
-struct thread_args {
-  char *path;
-  int priority, id;
-};
 
 void daemon_message(const char *msg) {
   int fd = open(output_from_daemon, O_CREAT | O_APPEND | O_WRONLY,
@@ -62,198 +56,149 @@ int count_dirs(char *path) {
 }
 
 // hash
-struct fd_node {
-  int id;
-  void *val;
-  struct fd_node *next;
-};
 
-struct my_map {
-  int length;
-  struct fd_node **lista;
-};
-
-void map_init(struct my_map *m, int n) {
-  m->length = n;
-  m->lista = (struct fd_node **)malloc(n * sizeof(struct fd_node *));
+void dir_hash_init(struct directory *m, int n) {
+  m->size = n;
+  m->content =
+      (struct file_directory **)malloc(n * sizeof(struct file_directory *));
   for (int i = 0; i < n; i++)
-    m->lista[i] = NULL;
+    m->content[i] = NULL;
 }
 
-struct fd_node *map_find(struct my_map *m, int key) {
-  int mod = key % m->length;
-  if (m->lista[mod] == NULL)
+struct file_directory *dir_hash_find(struct directory *m, int key) {
+  int mod = key % m->size; // se parcurge arborele si se cauta nivelul din
+                           // arbore
+  if (m->content[mod] == NULL)
     return NULL;
-  for (struct fd_node *nod = m->lista[mod]; nod != NULL; nod = nod->next) {
+  for (struct file_directory *nod = m->content[mod]; nod != NULL;
+       nod = nod->next) {
     if (nod->id == key)
       return nod;
   }
   return NULL;
 }
-
-int map_find_task(struct my_map *m, char *path) {
-  for (int i = 0; i < m->length; i++) {
-    if (m->lista[i] != NULL) {
-      for (struct fd_node *nod = m->lista[i]; nod != NULL; nod = nod->next) {
-        if (strcmp((char *)nod->val, path) == 0)
-          return nod->id;
+int find_task(struct directory *m, char *path) {
+  // se parcurge lista de taskuri
+  for (int i = 0; i < m->size; i++) {
+    if (m->content[i] != NULL) { // daca lista are elemente nenule(daca fiecare
+                                 // lista fd_node contine macar un element)
+      for (struct file_directory *nod = m->content[i]; nod != NULL;
+           nod = nod->next) { // se parcurge lista de fd_node
+        if (strcmp((char *)nod->fd_path, path) ==
+            0) // daca path-ul din nod este egal cu path-ul dat ca parametru
+          return nod->id; // se returneaza id-ul task-ului (inseamna ca task-ul
+                          // exista deja)
       }
     }
   }
   return -1;
 }
 
-void map_insert(struct my_map *m, int key, void *val) {
-  int mod = key % m->length;
-  if (m->lista[mod] == NULL) {
-    m->lista[mod] = (struct fd_node *)malloc(sizeof(struct fd_node *));
-    m->lista[mod]->val = val;
-    m->lista[mod]->id = key;
-    m->lista[mod]->next = NULL;
+void init_directory_tree(struct directory *m, int n) {
+  m->size = n;
+  m->content =
+      (struct file_directory **)malloc(n * sizeof(struct file_directory *));
+  for (int i = 0; i < n; i++)
+    m->content[i] = NULL;
+}
+
+// functia map_insert insereaza in map un nou task - folosita in functia Add
+void dir_hash_insert(struct directory *m, int key, void *val) {
+  int mod = key % m->size;
+  if (m->content[mod] == NULL) {
+    m->content[mod] =
+        (struct file_directory *)malloc(sizeof(struct file_directory *));
+    m->content[mod]->fd_path = val;
+    m->content[mod]->id = key;
+    m->content[mod]->next = NULL;
   } else {
-    struct fd_node *nod;
-    for (nod = m->lista[mod]; nod->next != NULL; nod = nod->next) {
+    struct file_directory *nod;
+    for (nod = m->content[mod]; nod->next != NULL; nod = nod->next) {
       if (nod->id == key) {
-        nod->val = val;
+        nod->fd_path = val;
         return;
       }
     }
     if (nod->id == key) {
-      nod->val = val;
+      nod->fd_path = val;
       return;
     }
-    nod->next = (struct fd_node *)malloc(sizeof(struct fd_node));
+    nod->next = (struct file_directory *)malloc(sizeof(struct file_directory));
     nod->next->next = NULL;
     nod->next->id = key;
-    nod->next->val = val;
+    nod->next->fd_path = val;
   }
 }
-// for debugging
-void map_print_int(struct my_map *m) {
-  for (int i = 0; i < m->length; i++) {
-    printf("%d: ", i);
-    if (m->lista[i] != NULL) {
-      struct fd_node *nod;
-      for (nod = m->lista[i]; nod != NULL; nod = nod->next) {
-        printf("(%d, %d) ", nod->id, *((int *)nod->val));
-      }
-    }
-    printf("\n");
-  }
+void directory_clear(struct directory *m) {
+  for (int i = 0; i < m->size; i++)
+    free(m->content[i]);
+  free(m->content);
 }
 
-void map_print_char(struct my_map *m, char *res) {
-  for (int i = 0; i < m->length; i++) {
-    sprintf(res, "%d: ", i);
-    if (m->lista[i] != NULL) {
-      struct fd_node *nod;
-      for (nod = m->lista[i]; nod != NULL; nod = nod->next) {
-        sprintf(res, "(%d, %s) ", nod->id, (char *)nod->val);
-      }
-    }
-    sprintf(res, "\n");
-  }
-}
-
-void map_delete(struct my_map *m, int id) {
-  struct fd_node *nod = (struct fd_node *)malloc(sizeof(struct fd_node));
-  nod = m->lista[id % m->length];
-  struct fd_node *prev = (struct fd_node *)malloc(sizeof(struct fd_node));
-  if (nod != NULL && nod->id == id) {
-    m->lista[id % m->length] = nod->next;
-    free(nod);
-  } else {
-    while (nod != NULL && nod->id != id) {
-      prev = nod;
-      nod = nod->next;
-    }
-
-    if (nod != NULL) {
-      prev->next = nod->next;
-      free(nod);
-    }
-  }
-}
-
-void map_clear(struct my_map *m) {
-  for (int i = 0; i < m->length; i++)
-    free(m->lista[i]);
-  free(m->lista);
-}
-
-struct thr_node {
-  int id;
-  int priority;
-  pthread_t *thr;
-  char *done_status;
-  int files, dirs, total_dirs;
-  struct thr_node *next;
-};
-
-void list_init() {
-  list_head = (struct thr_node **)malloc(sizeof(struct thr_node *));
-
-  *list_head = NULL;
-}
-
-void list_insert(struct thr_node **head_ref, int id, int priority,
+void insert_task(struct thread_node **threads_head, int id, int priority,
                  pthread_t *thr) {
 
-  struct thr_node *new_node =
-      (struct thr_node *)malloc(sizeof(struct thr_node));
+  struct thread_node *new_node =
+      (struct thread_node *)malloc(sizeof(struct thread_node));
 
   new_node->id = id;
   new_node->priority = priority;
   new_node->thr = thr;
-  new_node->done_status = (char *)malloc(30);
-  strcpy(new_node->done_status, "preparing");
-  new_node->files = 0;
-  new_node->dirs = 0;
+  new_node->status = (char *)malloc(30);
+  strcpy(new_node->status, "preparing");
+  new_node->no_files = 0;
+  new_node->no_dirs = 0;
   // find out total number of subdirectories
-  struct fd_node *node = map_find(tasks, id);
-  char *path = (char *)(node->val);
-  new_node->total_dirs = count_dirs(path);
+  struct file_directory *node = dir_hash_find(tasks, id);
+  char *path = (char *)(node->fd_path);
+  new_node->no_dirs = count_dirs(path);
 
-  new_node->next = *head_ref;
-  *head_ref = new_node;
+  new_node->next = *threads_head;
+  *threads_head = new_node;
 }
 
-void list_delete(struct thr_node **head_ref, int key) {
-  struct thr_node *aux = (struct thr_node *)malloc(sizeof(struct thr_node));
-  aux = *list_head;
-  struct thr_node *prev = (struct thr_node *)malloc(sizeof(struct thr_node));
+void thread_list_delete(struct thread_node **head_ref, int key) {
+  struct thread_node *current_thread =
+      (struct thread_node *)malloc(sizeof(struct thread_node));
+  current_thread = *threads_head;
+  struct thread_node *previous =
+      (struct thread_node *)malloc(sizeof(struct thread_node));
 
-  if (aux != NULL && aux->id == key) {
-    *head_ref = aux->next;
-    free(aux);
+  if (current_thread != NULL && current_thread->id == key) {
+    *head_ref = current_thread->next;
+    free(current_thread);
   } else {
-    while (aux != NULL && aux->id != key) {
-      prev = aux;
-      aux = aux->next;
+    while (current_thread != NULL && current_thread->id != key) {
+      previous = current_thread;
+      current_thread = current_thread->next;
     }
 
-    if (aux != NULL) {
-      prev->next = aux->next;
-      free(aux);
+    if (current_thread != NULL) {
+      previous->next = current_thread->next;
+      free(current_thread);
     }
   }
 }
 
-struct thr_node *list_find_by_key(struct thr_node **head_ref, int key) {
-  daemon_message("In list_find_by_key\n");
-  struct thr_node *current = (struct thr_node *)malloc(sizeof(struct thr_node));
-  current = *head_ref;
-  while (current != NULL) {
-    if (current->id == key) {
-      return current;
+// functia list_find_by_key returneaza threadul cu id-ul key - folosita in
+// functia Remove
+struct thread_node *find_thread_id(struct thread_node **head_ref, int key) {
+  daemon_message("In find_thread_id\n");
+  struct thread_node *current_thread =
+      (struct thread_node *)malloc(sizeof(struct thread_node));
+  current_thread = *head_ref;
+  while (current_thread != NULL) {
+    if (current_thread->id == key) {
+      return current_thread;
     }
-    current = current->next;
+    current_thread = current_thread->next;
   }
   return NULL;
 }
 
-struct thr_node *list_find_by_thr(struct thr_node **head_ref, pthread_t thr) {
-  struct thr_node *current = (struct thr_node *)malloc(sizeof(struct thr_node));
+struct thread_node *find_thread(struct thread_node **head_ref, pthread_t thr) {
+  struct thread_node *current =
+      (struct thread_node *)malloc(sizeof(struct thread_node));
   current = *head_ref;
   while (current != NULL) {
     if (pthread_equal(*(current->thr), thr)) {
@@ -264,41 +209,13 @@ struct thr_node *list_find_by_thr(struct thr_node **head_ref, pthread_t thr) {
   return NULL;
 }
 
-void list_print(struct thr_node **head_ref, char *res) {
-  res[0] = '\0';
-  struct thr_node *current = (struct thr_node *)malloc(sizeof(struct thr_node));
-  current = *list_head;
-  while (current != NULL) {
-    sprintf(res + strlen(res), "Id: %d, ", current->id);
-    current = current->next;
-  }
-  sprintf(res + strlen(res), "\n");
+void clear_directory(struct directory *m) {
+  for (int i = 0; i < m->size; i++)
+    free(m->content[i]);
+  free(m->content);
 }
 
-void *reverse(char *v) {
-  char *str = (char *)v, *s = str, *f = str + strlen(str) - 1;
-  while (s < f) {
-    *s ^= *f;
-    *f ^= *s;
-    *s ^= *f;
-    s++;
-    f--;
-  }
-  return str;
-}
-
-void itoa(int n, char *s) {
-  int i = 0;
-  // generate digits in reverse order
-  do {
-    s[i++] = n % 10 + '0';
-  } while ((n /= 10) > 0);
-
-  s[i] = '\0';
-  reverse(s);
-}
-
-char *get_progress(float percent) {
+char *progress(float percent) {
   char *res = (char *)malloc(51);
   res = "##################################################";
   int number_of_hashtags = percent * 50 / 100;
@@ -306,7 +223,7 @@ char *get_progress(float percent) {
   return res;
 }
 
-char *convert_size_to_standard_unit(float bytes) {
+char *convert_size(float bytes) {
   char *size = (char *)malloc(20);
   if (bytes >= 1024) { // KB
     bytes /= 1024;
@@ -335,37 +252,21 @@ char *convert_size_to_standard_unit(float bytes) {
   return size;
 }
 
-int get_file_size(const char *file_name) {
-  daemon_message("Inainte de fopen\n");
-  FILE *fp = fopen(file_name, "r");
-  daemon_message("Dupa fopen\n");
-  if (fp == NULL) {
-    printf("File Not Found!\n");
-    daemon_message("Dupa get file size\n");
-    return -1;
-  }
-  fseek(fp, 0, SEEK_END);
-  int res = ftell(fp);
-  fclose(fp);
-
-  return res;
-}
-
-void update_done_status(struct thr_node *node) {
+void update_done_status(struct thread_node *node) {
   float percent;
 
-  if (node->total_dirs == 0) {
+  if (node->no_all_dirs == 0) {
     percent = 100;
   } else {
-    percent = (1.0 * node->dirs * 100) / node->total_dirs;
+    percent = (1.0 * node->no_dirs * 100) / node->no_all_dirs;
   }
 
   if (abs(100 - percent) <= 0.00000000001) {
-    strcpy(node->done_status, "done");
+    strcpy(node->status, "done");
   } else {
     char *aux = (char *)malloc(30);
     sprintf(aux, "%.1f%% in progress\n", percent);
-    strcpy(node->done_status, aux);
+    strcpy(node->status, aux);
     free(aux);
   }
 }
