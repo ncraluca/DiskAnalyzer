@@ -22,6 +22,10 @@ void daemon_message(const char *message) {
   close(fd);
 }
 
+// fctia get_next_task_id() returneaza un id unic pentru fiecare task - folosita
+// in functia Add
+int get_next_task_id() { return ++task_id; }
+
 void create_directory(const char *given_path) {
   struct stat st = {0}; // a stat structure gives us info about a file or
                         // directory found at a given_path
@@ -31,6 +35,11 @@ void create_directory(const char *given_path) {
                  // read(4)+write(2)+execute(1) => to all users
   }
 }
+
+int compare(const FTSENT **one, const FTSENT **two) {
+  return (strcmp((*one)->fts_name, (*two)->fts_name));
+}
+
 int count_dirs(char *path) {
   int count = 0;
   FTS *file_system = NULL;
@@ -65,13 +74,26 @@ void dir_hash_init(struct directory *m, int size) {
   }
 }
 
+// functia *map_find returneaza nodul (task-ul) cu id-ul key - folosita in
+// functia Remove si Info
+struct file_directory *dir_hash_find(struct directory *m, int key) {
+  int mod = key % m->size; // se parcurge arborele si se cauta nivelul din
+                           // arbore
+  if (m->content[mod] == NULL)
+    return NULL;
+  for (struct file_directory *nod = m->content[mod]; nod != NULL;
+       nod = nod->next) {
+    if (nod->id == key)
+      return nod;
+  }
+  return NULL;
+}
+
 void thread_list_init() {
   threads_head = (struct thread_node **)malloc(sizeof(struct thread_node *));
   *threads_head = NULL;
 }
-// fctia get_next_task_id() returneaza un id unic pentru fiecare task - folosita
-// in functia Add
-int get_next_task_id() { return ++task_id; }
+
 void init_directory_tree(struct directory *m, int n) {
   m->size = n;
   m->content =
@@ -79,6 +101,16 @@ void init_directory_tree(struct directory *m, int n) {
   for (int i = 0; i < n; i++)
     m->content[i] = NULL;
 }
+
+
+void clear_directory(struct directory *m) {
+  for (int i = 0; i < m->size; i++)
+    free(m->content[i]);
+  free(m->content);
+}
+
+
+
 void insert_task(struct thread_node **threads_head, int id, int priority,
                  pthread_t *thr) {
 
@@ -90,6 +122,8 @@ void insert_task(struct thread_node **threads_head, int id, int priority,
   new_node->thr = thr;
   new_node->status = (char *)malloc(30);
   strcpy(new_node->status, "preparing");
+
+
   new_node->no_file = 0;
   new_node->no_dirs = 0;
   // find out total number of subdirectories
@@ -178,25 +212,6 @@ struct thread_node *find_thread(struct thread_node **head_ref, pthread_t thr) {
     current = current->next;
   }
   return NULL;
-}
-// functia *map_find returneaza nodul (task-ul) cu id-ul key - folosita in
-// functia Remove si Info
-struct file_directory *dir_hash_find(struct directory *m, int key) {
-  int mod = key % m->size; // se parcurge arborele si se cauta nivelul din
-                           // arbore
-  if (m->content[mod] == NULL)
-    return NULL;
-  for (struct file_directory *nod = m->content[mod]; nod != NULL;
-       nod = nod->next) {
-    if (nod->id == key)
-      return nod;
-  }
-  return NULL;
-}
-void clear_directory(struct directory *m) {
-  for (int i = 0; i < m->size; i++)
-    free(m->content[i]);
-  free(m->content);
 }
 
 char *progress(float percent) {
@@ -302,7 +317,7 @@ void dir_hash_delete(struct directory *m, int id) {
     }
   }
 }
-int compare(const FTSENT **one, const FTSENT **two) {
-  return (strcmp((*one)->fts_name, (*two)->fts_name));
-}
+
 #endif
+
+

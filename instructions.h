@@ -45,7 +45,7 @@ void Add(char *path, char *priority, char *buf) {
   int existing_task = find_task(dir, path); // functia e in alt fisier
 
   // se aloca memorie pentru un nou thread
-  pthread_t *new_thread = malloc(sizeof(pthread_t));
+  pthread_t *new_thread = (pthread_t *)malloc(sizeof(pthread_t));
 
   // daca task-ul nu exista deja in lista de task-uri, il adaugam
   if (existing_task == -1) {
@@ -71,7 +71,7 @@ void Add(char *path, char *priority, char *buf) {
     // cream un nou thread pentru task-ul adaugat
     if (pthread_create(new_thread, NULL, disk_analyzer, details)) {
       // disk_analyzer e in alt fisier
-      char *buf_error = malloc(30);
+      char *buf_error = (char *)malloc(30);
       sprintf(
           buf_error, "Could not create a new thread: %d\n",
           errno); // daca nu se poate crea un nou thread, se afiseaza eroarea
@@ -152,7 +152,7 @@ void Resume(int id, char *buf) {
 
 // functie care sterge un task din lista de task-uri
 void Remove(int id, char *buf) {
-  daemon_mesaage("We are in Remove method...\n");
+  daemon_message("We are in Remove method...\n");
   // cautam threadul cu id-ul id in lista de threaduri
   struct thread_node *thread_node = find_thread_id(threads_head, id);
 
@@ -205,7 +205,7 @@ void Info(int id, char *buf) {
   } else {
     // daca exista se cauta in map task-ul cu id-ul id
     sprintf(buf, "ID\tPRI\tPath\tDone Status\tDetails\n");
-    char priority[3] = "***"; // prioritatea e reprezentata de 3 stelute
+    char priority[4] = "***"; // prioritatea e reprezentata de 3 stelute
     struct file_directory *node = dir_hash_find(dir, thread_node->id);
     char *path = (char *)node->fd_path;
     // se afiseaza informatii despre task
@@ -230,7 +230,7 @@ void List(char *buf) {
             threads_head, node->id); // se cauta threadul cu id-ul node->id in
                                      // lista de threaduri
         daemon_message("Dupa thread_head\n");
-        char priority[3] = "***"; // prioritatea e reprezentata de 3 stelute
+        char priority[4] = "***"; // prioritatea e reprezentata de 3 stelute
         daemon_message("Inainte de dir_hash_find\n");
         struct file_directory *node2 = dir_hash_find(
             dir, node->id); // se cauta taskul cu id-ul node->id in map
@@ -258,9 +258,9 @@ void Print(int id, char *buf) {
     sprintf(buf, "No existing analysis for task ID %d", id);
   } else if (strcmp(thread_node->status, "done") ==
              0) { // daca task-ul este terminat
-    char *output_path = malloc(PATH_MAX);
+    char *output_path = (char *)malloc(PATH_MAX);
     char *msg =
-        malloc(PATH_MAX + 30); // se aloca memorie pentru path-ul fisierului de
+        (char *)malloc(PATH_MAX + 30); // se aloca memorie pentru path-ul fisierului de
                                // output si pentru un mesaj de eroare
 
     sprintf(output_path, "%s_%d.txt", output_from_daemon_prefix,
@@ -294,9 +294,9 @@ void handling_instructions(char *instruction, char *buf) {
     break;
   case 1: // ADD command
       ;
-    char *path = malloc(PATH_MAX);
+    char *path = (char *)malloc(PATH_MAX);
     path = strtok(NULL, "\n");
-    char *priority = malloc(PATH_MAX);
+    char *priority = (char *)malloc(PATH_MAX);
     priority = strtok(NULL, "\n");
     daemon_message(priority);
     Add(path, priority, buf);
