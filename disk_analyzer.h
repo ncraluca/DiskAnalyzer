@@ -18,7 +18,7 @@ void *disk_analyzer(void *args) {
   *pth = pthread_self();
   //   pthread_mutex_lock(&mtx_lock);
   insert_task(threads_head, id, pri, pth);
-  dir_hash_insert(tasks, id, path);
+  dir_hash_insert(dir, id, path);
   //   pthread_mutex_lock(&mtx_lock);
   // set thread priority
   int policy;
@@ -75,7 +75,7 @@ void *disk_analyzer(void *args) {
         if (nod0 != NULL) {
           *((float *)nod0->fd_path) += node->fts_statp->st_size;
         }
-        n->no_files++;
+        n->no_file++;
       } break;
 
       case FTS_DP: {

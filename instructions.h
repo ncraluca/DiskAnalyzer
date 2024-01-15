@@ -2,6 +2,7 @@
 #define INSTRUCTIONS_H_INCLUDED
 
 #include "utils.h"
+#include "disk_analyzer.h"
 #include <errno.h>
 #include <fcntl.h> // for open flags
 #include <fts.h>
@@ -210,7 +211,7 @@ void Info(int id, char *buf) {
     // se afiseaza informatii despre task
     sprintf(buf + strlen(buf), "%d\t%s\t%s\t%s\t%d files, %d dirs\n",
             thread_node->id, priority + (3 - thread_node->priority), path,
-            thread_node->status, thread_node->no_files, thread_node->no_dirs);
+            thread_node->status, thread_node->no_file, thread_node->no_dirs);
   }
 }
 
@@ -238,7 +239,7 @@ void List(char *buf) {
         daemon_message("Dupa conversie path\n");
         sprintf(buf + strlen(buf), "%d\t%s\t%s\t%s\t%d files, %d dirs\n",
                 node->id, priority + (3 - thread_node->priority), path,
-                thread_node->status, thread_node->no_files,
+                thread_node->status, thread_node->no_file,
                 thread_node->no_dirs); // se afiseaza informatii despre task
         daemon_message("Eroare dupa sprintf\n");
       }

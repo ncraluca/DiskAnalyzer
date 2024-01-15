@@ -10,9 +10,9 @@
 #include "utils.h"
 int daemon_pid;
 void write_to_daemon(const char* instruction) {
-    create_directory(instruction_file_path);
+    create_directory(input_from_user);
 
-    int fd = open(instruction_file_path, O_CREAT | O_TRUNC | O_WRONLY, S_IRWXU | S_IRWXG | S_IRWXO);
+    int fd = open(input_from_user, O_CREAT | O_TRUNC | O_WRONLY, S_IRWXU | S_IRWXG | S_IRWXO);
     int len = strlen(instruction);
     write(fd, instruction, len);
     close(fd);
@@ -27,14 +27,14 @@ void write_to_daemon(const char* instruction) {
 }
 
 void read_daemon_pid() {
-    int fd = open(daemon_pid_file_path, O_RDONLY);
+    int fd = open(daemon_pid_path, O_RDONLY);
     if (fd < 0) {
         perror("Daemon hasn't started");
         exit(EXIT_FAILURE);
     }
 
-    char buf[MAX_PID_LENGTH];
-    ssize_t bytesRead = read(fd, buf, MAX_PID_LENGTH);
+    char buf[MAX_PID_LENGHT];
+    ssize_t bytesRead = read(fd, buf, MAX_PID_LENGHT);
     close(fd);
 
     if (bytesRead <= 0) {
@@ -52,7 +52,7 @@ void read_results_from_daemon(int signo) {
         exit(EXIT_FAILURE);
     }
     daemon_message("Dupa primeste marime fisier\n");
-    FILE* file = fopen(output_file_path, "r");
+    FILE* file = fopen(output_from_daemon, "r");
     if (file == NULL) {
         perror("Couldn't open daemon output file");
         free(res);
@@ -61,7 +61,7 @@ void read_results_from_daemon(int signo) {
     daemon_message("Inainte de malloc\n");
 
     daemon_message("Dupa malloc\n");
-    syze_t bytesRead = fread(res, 1, 1000000, file);
+    size_t bytesRead = fread(res, 1, 1000000, file);
     fclose(file);
 
     if (bytesRead <= 0) {
@@ -75,12 +75,12 @@ void read_results_from_daemon(int signo) {
 }
 
 void write_da_pid() {
-    create_directory(da_pid_file_path);
+    create_directory(da_pid_path);
 
-    char pidstring[MAX_PID_LENGTH];
+    char pidstring[MAX_PID_LENGHT];
     sprintf(pidstring, "%d", getpid());
 
-    int fd = open(da_pid_file_path, O_CREAT | O_TRUNC | O_WRONLY, S_IRWXU | S_IRWXG | S_IRWXO);
+    int fd = open(da_pid_path, O_CREAT | O_TRUNC | O_WRONLY, S_IRWXU | S_IRWXG | S_IRWXO);
     if (fd < 0) {
         perror("Could not create da pid file");
         exit(EXIT_FAILURE);

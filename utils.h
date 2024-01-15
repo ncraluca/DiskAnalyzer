@@ -93,7 +93,7 @@ void insert_task(struct thread_node **threads_head, int id, int priority,
   new_node->no_file = 0;
   new_node->no_dirs = 0;
   // find out total number of subdirectories
-  struct file_directory *node = dir_hash_find(tasks, id);
+  struct file_directory *node = dir_hash_find(dir, id);
   char *path = (char *)(node->fd_path);
   new_node->no_dirs = count_dirs(path);
 
