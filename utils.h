@@ -3,11 +3,14 @@
 
 #include "constants.h"
 #include <errno.h>
+#include <fcntl.h>
 #include <fts.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
-#include <sys/types.h>
+#include <unistd.h>
 
 void daemon_message(const char *message) {
   int fd = open(debug_daemon, O_CREAT | O_APPEND | O_WRONLY, S_IRWXU,
@@ -87,7 +90,7 @@ void insert_task(struct thread_node **threads_head, int id, int priority,
   new_node->thr = thr;
   new_node->status = (char *)malloc(30);
   strcpy(new_node->status, "preparing");
-  new_node->no_files = 0;
+  new_node->no_file = 0;
   new_node->no_dirs = 0;
   // find out total number of subdirectories
   struct file_directory *node = dir_hash_find(tasks, id);
