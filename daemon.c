@@ -38,8 +38,9 @@ void get_da_task(){
     char *result = (char*)malloc(RESULT_SIZE);
     char *instruction = (char*)malloc(500);
     fd = open(input_from_user, O_RDONLY);
-    char *s = RESULT_SIZE;
+    read(fd, instruction, 500);
     handling_instructions(instruction, result); //function from process_instructions.h that processes the socution
+    char *s = RESULT_SIZE;
     sprintf(s, "Final solution from daemon solution: %s", result);
     daemon_message(s);
     write_solution(result);
