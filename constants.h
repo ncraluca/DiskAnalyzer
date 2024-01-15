@@ -11,6 +11,7 @@
 #define PRINT "7"
 
 #define INSTR_LENGTH 100
+#define RESULT_SIZE 1000000
 
 //rutele catre fisierele folosite de daemon
 const char *daemon_pid = "/tmp/disk-analyzer/daemon.pid";
@@ -28,23 +29,23 @@ int task_id;
 // hash 
 //Acesta contine id-ul, valoarea de tip void *-> adica path-ul, si un pointer la urmatorul element din lista.
 //un nod = un task
-struct fd_node {
+struct file_directory {
     int id;
-    void *val;
-    struct fd_node *next;
+    void *fd_path;
+    struct file_directory *next;
 };
 
 //o structura de tipul lungime lista cu elemente de tip fd_node, lista
 //cu toate elementele fd_node.
-struct my_map {
-    int length;
-    struct fd_node **lista;
+struct directory {
+    int size;
+    struct file_directory **content;
 };
 
 //lista de taskuri
-struct my_map *tasks;
+struct directory *dir;
 
- struct thread_args {
+ struct thread_details {
             char *path;
             int priority;
             int id;
@@ -52,17 +53,17 @@ struct my_map *tasks;
 
 //folosite in Remove
 //lista de threaduri
-struct thr_node {
+struct thread_node {
     int id;
     int priority;
     pthread_t *thr;
-    char *done_status;
-    int files, dirs, total_dirs;
+    char *status;
+    int no_files, no_dirs, no_all_dirs;
     struct thr_node *next;
 };
 
 //capul listei de threaduri
-struct thr_node **list_head;
+struct thread_node **threads_head;
 
 
 
