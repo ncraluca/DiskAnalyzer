@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include "utils.h"
 int daemon_pid;
+
 void write_to_daemon(const char* instruction) {
     create_directory(input_from_user);
 
@@ -22,7 +23,7 @@ void write_to_daemon(const char* instruction) {
         sleep(2);
     } else {
         fprintf(stderr, "Couldn't send instruction to daemon because it is not running\n");
-        exit(EXIT_FAILURE);
+        exit(-1);
     }
 }
 
@@ -32,63 +33,43 @@ void read_daemon_pid() {
         perror("Daemon hasn't started");
         exit(EXIT_FAILURE);
     }
-
-    char buf[MAX_PID_LENGHT];
-    ssize_t bytesRead = read(fd, buf, MAX_PID_LENGHT);
+    char *buf = (char*) malloc(MAX_PID_LENGHT); 
+    read(fd, buf, MAX_PID_LENGHT);
     close(fd);
-
-    if (bytesRead <= 0) {
-        perror("Error reading daemon pid");
-        exit(EXIT_FAILURE);
-    }
-
     daemon_pid=atoi(buf);
 }
 
 void read_results_from_daemon(int signo) {
     char* res = malloc(1000000);
-    if (res == NULL) {
-        perror("Memory allocation error");
-        exit(EXIT_FAILURE);
+    int size = RESULT_SIZE;
+    int fd = open(output_from_daemon, O_RDONLY, S_IRWXU | S_IRWXG | S_IRWXO);
+    if(fd<0){
+        daemon_message("Eroare la deschidere fisier output\n");
     }
-    daemon_message("Dupa primeste marime fisier\n");
-    FILE* file = fopen(output_from_daemon, "r");
-    if (file == NULL) {
-        perror("Couldn't open daemon output file");
-        free(res);
-        return;
-    }
-    daemon_message("Inainte de malloc\n");
-
-    daemon_message("Dupa malloc\n");
-    size_t bytesRead = fread(res, 1, 1000000, file);
-    fclose(file);
-
-    if (bytesRead <= 0) {
-        perror("Error reading from daemon output file");
-        free(res);  // Free allocated memory before exiting
-        exit(EXIT_FAILURE);
-    }
+    read(fd, res, size);
     daemon_message("Dupa read\n");
+    close(fd);
     printf("%s\n", res);
-    free(res);
+    //free(res);
 }
 
 void write_da_pid() {
     create_directory(da_pid_path);
 
-    char pidstring[MAX_PID_LENGHT];
+    char* pidstring = malloc(MAX_PID_LENGHT);
     sprintf(pidstring, "%d", getpid());
 
     int fd = open(da_pid_path, O_CREAT | O_TRUNC | O_WRONLY, S_IRWXU | S_IRWXG | S_IRWXO);
     if (fd < 0) {
         perror("Could not create da pid file");
-        exit(EXIT_FAILURE);
+        //exit(EXIT_FAILURE);
     }
 
     write(fd, pidstring, strlen(pidstring));
     close(fd);
 }
+
+
 int main(int argc, char** argv) {
     signal(SIGUSR2, read_results_from_daemon);
     write_da_pid();
