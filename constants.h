@@ -30,7 +30,7 @@ const char *input_from_user = "/tmp/disk-analyzer/input.txt";
 const char *output_from_daemon_prefix = "/tmp/disk-analyzer/output";
 const char *output_from_daemon = "/tmp/disk-analyzer/output.txt";
 const char *debug_daemon = "/tmp/disk-analyzer/debug.txt";
-
+int task_id;
 pthread_mutex_t mutex_lock, mutex_lock_directory;
 
 //a sort of a hash table association between a file and its data
@@ -44,7 +44,11 @@ struct directory {
     int size;
     struct file_directory **content;
 };
-
+ struct thread_details {
+            char *path;
+            int priority;
+            int id;
+};
 struct thread_node {
     int id; //job ID;   
     int priority;
