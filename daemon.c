@@ -54,7 +54,7 @@ void initialization(){
         daemon_message("Error at assigning the thread mutex\n");
     }
     dir = malloc(sizeof(struct directory));
-    dir_hash_init(dir,10); //allocated space for the initial analysis of 10 directories
+    dir_hash_init(dir,100); //allocated space for the initial analysis of 10 directories
     thread_list_init();
     signal(SIGUSR1, get_da_task);
 }
@@ -66,7 +66,7 @@ void write_daemon_pid(){
     int fd = open(daemon_pid_path, O_CREAT|O_TRUNC|O_WRONLY, S_IRWXU|S_IRWXG|S_IRWXO);
     if(fd < 0){
         perror("Couldn't open daemon input file\n");
-        return errno;
+        exit(-1);
     }
 
     char *pidstring = malloc(MAX_PID_LENGHT);

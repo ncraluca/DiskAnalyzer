@@ -18,10 +18,10 @@ void* disk_analyzer(void *args) {
 
   pthread_t *pth = (pthread_t*)malloc(sizeof(pthread_t));
   *pth = pthread_self();
-  //   pthread_mutex_lock(&mtx_lock);
+  //pthread_mutex_lock(&mutex_lock);
   insert_task(threads_head, id, pri, pth);
   dir_hash_insert(dir, id, path);
-  //   pthread_mutex_lock(&mtx_lock);
+  //pthread_mutex_lock(&mutex_lock);
   // set thread priority
   int policy;
   struct sched_param param;
@@ -47,7 +47,7 @@ void* disk_analyzer(void *args) {
   }
 
   struct directory m;
-  dir_hash_init(&m, 10);
+  dir_hash_init(&m, 100);
   // postorder
   FTS *file_system = NULL;
   FTSENT *node = NULL;

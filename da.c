@@ -8,7 +8,61 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include "utils.h"
+#define VALID_OPTIONS_COUNT 16
+const char *VALID_OPTIONS[VALID_OPTIONS_COUNT] = {"--add", "-a","--list","-l", "--help", "-h","--suspend", "-S", "--resume","-R","--info","-i","--print","-p","--remove","-r"};
 int daemon_pid;
+
+bool check_valid_option(const char *option) {
+    for (int i = 0; i < VALID_OPTIONS_COUNT; ++i) {
+        if (strcmp(option, VALID_OPTIONS[i]) == 0) {
+            return true;  // Valid option found
+        }
+    }
+    return false;  // Option not found in the valid options
+}
+bool is_list_help_command(const char *command) {
+    return (strcmp(command, "--list") == 0 || strcmp(command, "--help") == 0 || strcmp(command,"-l")==0 || strcmp(command,"-h")==0);
+}
+
+
+bool is_add_command(const char *command) {
+    return (strcmp(command, "--add") == 0 || strcmp(command, "-a") == 0);
+}
+
+
+bool is_priority_command(const char *command){
+    return (strcmp(command,"-p")==0 || strcmp(command,"--priority")==0);
+}
+
+
+bool is_list_command(const char *command) {
+    return (strcmp(command, "--list") == 0 || strcmp(command, "-l")==0);
+}
+
+bool is_help_command(const char *command) {
+    return (strcmp(command, "--help") == 0 || strcmp(command, "-h") ==0);
+}
+
+bool is_suspend_command(const char *command) {
+    return (strcmp(command, "--suspend") == 0||strcmp(command, "-S") ==0);
+}
+
+bool is_remove_command(const char *command) {
+    return (strcmp(command, "--remove") == 0 || strcmp(command, "-r") ==0);
+}
+
+bool is_info_command(const char *command) {
+    return (strcmp(command, "--info") == 0 || strcmp(command, "-i") ==0);
+}
+
+bool is_print_command(const char *command) {
+    return (strcmp(command, "--print") == 0 || strcmp(command, "-p") ==0);
+}
+
+bool is_resume_command(const char *command) {
+    return (strcmp(command, "--resume") == 0 || strcmp(command, "-R") ==0);
+}
+
 
 void write_to_daemon(const char* instruction) {
     create_directory(input_from_user);
@@ -68,7 +122,10 @@ void write_da_pid() {
     write(fd, pidstring, strlen(pidstring));
     close(fd);
 }
-
+void error_message(){
+    printf("No arguments found. Please introduce an analyze-option and a desired path.\n");
+    printf("Use --help command for more information.\n");
+}
 
 int main(int argc, char** argv) {
     signal(SIGUSR2, read_results_from_daemon);
@@ -77,28 +134,23 @@ int main(int argc, char** argv) {
     
     char* instruction = malloc(INSTR_LENGTH);
     if (argc == 1) {
-        printf("No arguments found. Please introduce an analyze-option and a desired path.\n");
-        printf("Use --help command for more information.\n");
-        return 0;
-    } else if (
-        strcmp(argv[1], "-a") && strcmp(argv[1], "--add") && strcmp(argv[1], "-p") && strcmp(argv[1], "--priority")
-        && strcmp(argv[1], "-S") && strcmp(argv[1], "--suspend") && strcmp(argv[1], "-R") && strcmp(argv[1], "--resume")
-        && strcmp(argv[1], "-r") && strcmp(argv[1], "--remove") && strcmp(argv[1], "-i") && strcmp(argv[1], "--info")
-        && strcmp(argv[1], "-l") && strcmp(argv[1], "--list") && strcmp(argv[1], "-h") && strcmp(argv[1], "--help")
-    ) {
-        printf("No such option, please choose a valid option.\nUse --help command for more information.\n");
-        return 0;
-    } else if (argc == 2 && strcmp(argv[1], "-l") && strcmp(argv[1], "--list") && strcmp(argv[1], "-h") && strcmp(argv[1], "--help")){
-        printf("No task-id found. Please select an existing task-id.\n");
-        return 0;
-    } else if (argc >= 4 && (strcmp(argv[1], "-a") && strcmp(argv[1], "--add") && (!strcmp(argv[3], "-p") || !strcmp(argv[3], "--priority")))){
-        printf("Cannot set priority for a nonexistent analysis task. Please use the -a or --add option.\n");
-        return 0;
+        error_message();
+        return EXIT_FAILURE;
+    } else if (check_valid_option(argv[1]) == false) 
+    {
+        error_message();
+        return EXIT_FAILURE;
+    } else if (argc == 2 && is_list_help_command(argv[1]) == false){
+        error_message();
+        return EXIT_FAILURE;
+    } else if (argc >= 4 && (is_add_command(argv[1]) && (is_priority_command(argv[3]))==false)){
+        error_message();
+        return EXIT_FAILURE;
     } else {
-        if (!strcmp(argv[1], "-a") || !strcmp(argv[1], "--add")){
-            if (argc != 5 || (argc == 5 && strcmp(argv[3], "-p") && strcmp(argv[3], "--priority"))){
+        if (is_add_command(argv[1])){
+            if (argc != 5 || (argc == 5 && !is_priority_command(argv[3]))){
                 printf("Invalid arguments for --add command.\nUse --help command for more information.\n");
-                return 0;
+                return EXIT_FAILURE;
             } else { // ADD command
                 char* priority = malloc(7);
                 // TODO check is valid path 
@@ -111,14 +163,14 @@ int main(int argc, char** argv) {
                 else printf("Invalid arguments for --add command.\nUse --help command for more information.\n");
                 sprintf(instruction, "%s\n%s\n%s\n", ADD, argv[2], priority);
             }
-        } else if (!strcmp(argv[1], "-l") || !strcmp(argv[1], "--list")){ 
+        } else if (is_list_command(argv[1])){ 
             if (argc > 2){
                 printf("Invalid arguments for --list command.\nUse --help command for more information.\n");
                 return 0;
             } else { // LIST command
                 sprintf(instruction, "%s\n", LIST);
             }
-        } else if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")){ 
+        } else if (is_help_command(argv[1])){ 
             if (argc > 2){
                 printf("Invalid arguments for --help command.\n");
                 return 0;
@@ -128,27 +180,27 @@ int main(int argc, char** argv) {
         } else if (argc != 3){
             printf("Invalid number of arguments.\nUse --help command for more information.\n");
             return 0;
-        } else if (!strcmp(argv[1], "-S") || !strcmp(argv[1], "--suspend")){
+        } else if (is_suspend_command(argv[1])){
             if(!atoi(argv[2]))
                 printf ("Invalid task ID.");
             // SUSPEND command
             sprintf(instruction, "%s\n%s\n", SUSPEND, argv[2]);
-        } else if (!strcmp(argv[1], "-R") || !strcmp(argv[1], "--resume")){
+        } else if (is_resume_command(argv[1])){
             if(!atoi(argv[2]))
                 printf ("Invalid task ID.");
             // RESUME command
             sprintf(instruction, "%s\n%s\n", RESUME, argv[2]);
-        } else if (!strcmp(argv[1], "-r") || !strcmp(argv[1], "--remove")){
+        } else if (is_remove_command(argv[1])){
             if(!atoi(argv[2]))
                 printf ("Invalid task ID.");
             // REMOVE command
             sprintf(instruction, "%s\n%s\n", REMOVE, argv[2]);
-        } else if (!strcmp(argv[1], "-i") || !strcmp(argv[1], "--info")){
+        } else if (is_info_command(argv[1])){
             if(!atoi(argv[2]))
                 printf ("Invalid task ID.");
             // INFO command
             sprintf(instruction, "%s\n%s\n", INFO, argv[2]);
-        } else if (!strcmp(argv[1], "-p") || !strcmp(argv[1], "--print")){
+        } else if (is_print_command(argv[1])){
             if(!atoi(argv[2]))
                 printf ("Invalid task ID.");
             // PRINT command
